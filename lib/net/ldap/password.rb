@@ -36,6 +36,10 @@ class Net::LDAP::Password
       raise Net::LDAP::HashTypeUnsupportedError, "Unsupported password-hash type (#{type})"
     end
 
+    def generate_plain(str)
+      str
+    end
+
     def generate_md5(str)
       '{MD5}' + Base64.encode64(Digest::MD5.digest(str)).chomp
     end
@@ -49,10 +53,17 @@ class Net::LDAP::Password
       '{SSHA}' + Base64.encode64(Digest::SHA1.digest(str + salt) + salt).chomp
     end
 
+    def generate_ssha512(str)
+      salt = SecureRandom.random_bytes(16)
+      '{SSHA-512}' + Base64.encode64(Digest::SHA512.digest(str + salt) + salt).chomp
+    end
+
   end
 
+  add_hash_algo(:plain,   method(:generate_plain).to_proc)
   add_hash_algo(:md5,     method(:generate_md5).to_proc)
   add_hash_algo(:sha,     method(:generate_sha).to_proc)
   add_hash_algo(:ssha,    method(:generate_ssha).to_proc)
+  add_hash_algo(:ssha512, method(:generate_ssha512).to_proc)
 
 end
