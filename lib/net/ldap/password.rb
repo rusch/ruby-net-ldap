@@ -1,11 +1,20 @@
-# -*- ruby encoding: utf-8 -*-
-require 'digest/sha1'
-require 'digest/md5'
+require 'digest'
+require 'digest'
 require 'base64'
 require 'securerandom'
 
 class Net::LDAP::Password
   class << self
+    @@hash_algos = {}
+
+    def add_hash_algo(type, proc)
+      @@hash_algos[type] = proc
+    end
+
+    def hash_algos
+      @@hash_algos.keys
+    end
+
     # Generate a password-hash suitable for inclusion in an LDAP attribute.
     # Pass a hash type as a symbol (:md5, :sha, :ssha) and a plaintext
     # password. This function will return a hashed representation.
@@ -19,20 +28,31 @@ class Net::LDAP::Password
     # * Should we provide sha1 as a synonym for sha1? I vote no because then
     #   should you also provide ssha1 for symmetry?
     #
-    attribute_value = ""
     def generate(type, str)
-      case type
-      when :md5
-         attribute_value = '{MD5}' + Base64.encode64(Digest::MD5.digest(str)).chomp!
-      when :sha
-         attribute_value = '{SHA}' + Base64.encode64(Digest::SHA1.digest(str)).chomp!
-      when :ssha
-         salt = SecureRandom.random_bytes(16)
-         attribute_value = '{SSHA}' + Base64.encode64(Digest::SHA1.digest(str + salt) + salt).chomp!
-      else
-         raise Net::LDAP::HashTypeUnsupportedError, "Unsupported password-hash type (#{type})"
+      if proc = @@hash_algos[type]
+        return proc.call(str)
       end
-      return attribute_value
+
+      raise Net::LDAP::HashTypeUnsupportedError, "Unsupported password-hash type (#{type})"
     end
+
+    def generate_md5(str)
+      '{MD5}' + Base64.encode64(Digest::MD5.digest(str)).chomp
+    end
+
+    def generate_sha(str)
+      '{SHA}' + Base64.encode64(Digest::SHA1.digest(str)).chomp
+    end
+
+    def generate_ssha(str)
+      salt = SecureRandom.random_bytes(16)
+      '{SSHA}' + Base64.encode64(Digest::SHA1.digest(str + salt) + salt).chomp
+    end
+
   end
+
+  add_hash_algo(:md5,     method(:generate_md5).to_proc)
+  add_hash_algo(:sha,     method(:generate_sha).to_proc)
+  add_hash_algo(:ssha,    method(:generate_ssha).to_proc)
+
 end
