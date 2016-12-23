@@ -707,7 +707,7 @@ class Net::LDAP::Connection #:nodoc:
   # Wrap around Socket.tcp to normalize with other Socket initializers
   class DefaultSocket
     def self.new(host, port, socket_opts = {})
-      Socket.tcp(host, port, socket_opts)
+      Socket.tcp(host, port, nil, nil, socket_opts)
     end
   end
 end # class Connection
