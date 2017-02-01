@@ -709,8 +709,22 @@ class Net::LDAP::Connection #:nodoc:
 
   # Wrap around Socket.tcp to normalize with other Socket initializers
   class DefaultSocket
+
+    # The only supported socket option is :connect_timeout
     def self.new(host, port, socket_opts = {})
-      Socket.tcp(host, port, nil, nil, socket_opts)
+      addr = Socket.getaddrinfo(host, nil).sample
+      sock = Socket.new(Socket.const_get(addr[0]), Socket::SOCK_STREAM, 0)
+
+      if socket_opts.key?(:connect_timeout)
+        timeout  = socket_opts[:connect_timeout].to_f
+        seconds  = timeout.to_i
+        useconds = ((timeout.to_f - seconds) * 1_000_000).to_i
+        optval = [timeout, useconds].pack("l_2")
+        sock.setsockopt Socket::SOL_SOCKET, Socket::SO_RCVTIMEO, optval
+        sock.setsockopt Socket::SOL_SOCKET, Socket::SO_SNDTIMEO, optval
+      end
+      sock.connect(Socket.pack_sockaddr_in(port, addr[3]))
+      sock
     end
   end
 end # class Connection
